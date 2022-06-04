@@ -1,0 +1,9 @@
+200000: upgrade trigger region (bootloader looks at 0x276f00 to see if it is time to upgrade)
+201000: upgrade content region
+
+400000: logo splash
+6c0000: 0x27878 NUM.BIN
+680000: 0x2feb0 HZ12.BIN ("CHIN")
+714000: 0x3700 from 0x1000466c
+
+70x000: 0x80-byte blocks of data (gppsta structures?)
