@@ -1,0 +1,15 @@
+USB UART notes:
+on sys_hw_type == 3, USB UART is 4, otherwise it is 3
+serial UART is 4 also on sys_hw_type == 3
+
+interfaces:
+0 = USB
+1 = RS232
+2 = GPIB
+3 = LAN
+
+on sys_hw_type == 3, to mux UART4:
+gpio_set(0x15, 0) for RS232 (2009803c <- 00040000) FIO1CLR.18
+gpio_set(0x15, 1) for USB   (20098038 <- 00040000) FIO1SET.18
+
+
