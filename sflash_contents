@@ -7,3 +7,5 @@
 714000: 0x3700 from 0x1000466c
 
 70x000: 0x80-byte blocks of data (gppsta structures?)
+
+memcpy(0x73018, 0x10000000, 0x4654)

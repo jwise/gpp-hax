@@ -1,6 +1,5 @@
 #include "api.h"
 
-
 void *memcpy(char *dst, char *src, int n)
 {
 	char *dst0 = dst;
@@ -18,5 +17,6 @@ void *memset(char *b, int c, int len)
 }
 
 void entry() {
-	ui_modal_and_wait("Ligma balls!");
+	ui_set_overlay_params(5, 0, 0);
+	ui_set_overlay_text(*ui_modal_overlay, "Ligma balls!");
 }

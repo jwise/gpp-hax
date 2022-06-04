@@ -10,7 +10,7 @@ BASEAD = 0xa000
 
 elf = ELFFile(open(sys.argv[2], 'rb'))
 for sh in elf.iter_sections():
-    if sh['sh_type'] == 'SHT_PROGBITS' and (sh['sh_flags'] & 2):
+    if sh['sh_type'] == 'SHT_PROGBITS' and (sh['sh_flags'] & SHF_ALLOC):
         ofs = sh['sh_addr']
         l = len(sh.data())
         print(f"{sh.name} loaded at {ofs:x}, {l} bytes")
