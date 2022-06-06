@@ -18,3 +18,6 @@ NATIVE(malloc_annotated, 0x1a9b5)
 NATIVE(free, 0x1aa95)
 NATIVE(ui_modal_overlay, 0x10000be8)
 NATIVE(file_write, 0x296ef)
+NATIVE(GPPFilLoad, 0x29675)
+NATIVE(sprintf, 0x41c8d)
+

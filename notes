@@ -2,6 +2,8 @@ USB UART notes:
 on sys_hw_type == 3, USB UART is 4, otherwise it is 3
 serial UART is 4 also on sys_hw_type == 3
 
+note that UARTs are +1, so UART4 == UARt0
+
 interfaces:
 0 = USB
 1 = RS232
@@ -13,3 +15,32 @@ gpio_set(0x15, 0) for RS232 (2009803c <- 00040000) FIO1CLR.18
 gpio_set(0x15, 1) for USB   (20098038 <- 00040000) FIO1SET.18
 
 
+GPIOs:
+
+P0.20: CH4 LED
+P0.18: CH1 LED
+P0.21: CH2 LED
+P0.24: CH3 LED
+P1.31: ALL ON LED
+
+buttons:
+
+out v
+in >   0.26  P3.22  P3.23  P3.29  P3.30  P3.31
+P3.16
+P3.17
+P3.18
+P3.19
+P3.20  n/c    right  ch3on  ch3    ch1on  F5
+P3.21
+
+P2.14 / P2.15 quadrature encoder
+
+PWM1.PWM[2] is backlight
+  PR = 0
+  MCR = 0
+  MR0 = 5dc
+  MR2 = A bright, 3e8 dim
+
+PWM0.PWM[2] is beeper?
+PWM0.PWM[3] is unknown
