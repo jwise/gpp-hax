@@ -294,6 +294,8 @@ ResetISR(void) {
 	}
 }
 
+extern int puts(const char *s);
+
 void irq()
 {
 	GPIO_Init();
@@ -301,6 +303,7 @@ void irq()
 	PINSEL_ConfigPin(1, 31, 0);
 	GPIO_SetDir(1, 1 << 31, 1);
 	GPIO_OutputValue(1, 1 << 31, 1);
+	puts("IRQ\r\n");
 }
 
 //*****************************************************************************
@@ -311,14 +314,43 @@ __attribute__ ((section(".after_vectors")))
 void NMI_Handler(void)
 {
     irq();
+    puts("NMI\r\n");
     while(1)
     {
     }
 }
 __attribute__ ((section(".after_vectors")))
+__attribute__((naked))
 void HardFault_Handler(void)
 {
+    asm volatile(
+      "mrs r0, msp\n"
+      "mrs r1, psp\n"
+      "mov r2, lr\n"
+      "ldr r3, =HardFault_Handler_C\n"
+      "bx r3\n"
+    );
+}
+
+__attribute__ ((section(".after_vectors")))
+void HardFault_Handler_C(uint32_t *msp, uint32_t *psp, uint32_t lr) {      
     irq();
+#define SAY(s, val) puts(s " "); puthex(val); puts("\r\n");
+    puts("Hard fault\r\n");
+    int is_psp = lr & 4;
+    int is_thread = lr & 8;
+    uint32_t *sp = is_psp ? psp : msp;
+    SAY("HFSR", SCB->HFSR);
+    SAY("CFSR", SCB->CFSR);
+    SAY("exc ", lr);
+    SAY("r0  ", sp[0]);
+    SAY("r1  ", sp[1]);
+    SAY("r2  ", sp[2]);
+    SAY("r3  ", sp[3]);
+    SAY("r12 ", sp[4]);
+    SAY("lr  ", sp[5]);
+    SAY("pc  ", sp[6]);
+    
     while(1)
     {
     }
@@ -327,6 +359,7 @@ __attribute__ ((section(".after_vectors")))
 void MemManage_Handler(void)
 {
     irq();
+    puts("MemManage\r\n");
     while(1)
     {
     }
@@ -335,6 +368,7 @@ __attribute__ ((section(".after_vectors")))
 void BusFault_Handler(void)
 {
     irq();
+    puts("Bus Fault\r\n");
     while(1)
     {
     }
@@ -343,6 +377,7 @@ __attribute__ ((section(".after_vectors")))
 void UsageFault_Handler(void)
 {
     irq();
+    puts("Usage Fault\r\n");
     while(1)
     {
     }
@@ -351,6 +386,7 @@ __attribute__ ((section(".after_vectors")))
 void SVCall_Handler(void)
 {
     irq();
+    puts("SVCall\r\n");
     while(1)
     {
     }

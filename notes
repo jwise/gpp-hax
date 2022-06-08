@@ -35,7 +35,7 @@ P3.20  n/c    right  ch3on  ch3    ch1on  F5
 P3.21
 
 P2.14 / P2.15 quadrature encoder
-
+1 << 6, 1 << 10, 1 << 10
 PWM1.PWM[2] is backlight
   PR = 0
   MCR = 0
@@ -44,3 +44,137 @@ PWM1.PWM[2] is backlight
 
 PWM0.PWM[2] is beeper?
 PWM0.PWM[3] is unknown
+
+***
+
+LCD:
+
+panel_clk = 9000000
+LCD_POL |= BCD
+
+20088000 = 1012874
+  PPL = 29 (480)
+  HSW = 40
+  HFP = 1
+  HBP = 1
+20088004 = 202250f
+  LPP = 271
+  VSW = 9
+  VFP = 2
+  VBP = 2
+20088008 = 5df3800
+  PCD_LO = 0
+  CLKSEL = 0
+  ACB = 0
+  IVS = 1
+  IHS = 1
+  IPC = 1
+  IOE = 0
+  CPL = 479
+  BCD = 1
+  PCD_HI = 0
+20088018 = 0
+20088018 = 1012d
+  LcdEn = 1
+  LcdBpp = 6 (16bpp, rgb565)
+  LcdBW = 0
+  LcdTFT = 1
+  LcdMono8 = 0
+  LcdDual = 0
+  BGR = 1
+  BEBO = 0
+  BEPO = 0
+  LcdPwr = 0
+  LcdVComp = 0
+  WATERMARK = 1
+
+GpioCfgFromTable(7,1)
+  -> 2.1 = 1
+GpioCfgFromTable(0x24, 1)
+  -> 2.0 = 1
+
+a framebuffer is 259200 bytes, so definitely need to turn on DRAM
+
+***
+
+EMC:
+
+DYNAMIC MEMORY:
+
+2009c008 = 0
+  ENCConfig = 0
+400fc1dc = 808
+  EMCDLYCTL, CMDDLY = 8, FBCLKDIV = 8
+2009c100 = 680
+  EMCDynamicConfig0
+  AM = 13 = 256 Mb (16Mx16), 4 banks, row length = 13, column length = 9
+2009c104 = 303
+  RAS = 3
+  CAS = 3
+2009c028 = 1
+  EMCDynamicReadConfig.RD = 1
+2009c030 = 3
+  EMCDynamictRP.tRP = 3
+2009c034 = 6
+  EMCDynamictRAS.tRAS = 6
+2009c038 = 10
+  EMCDynamictSREX.tSREX = 0x10
+2009c03c = 2
+  EMCDynamictAPR.tAPR = 2
+2009c040 = 5
+  EMCDynamictDAL.tDAL = 5
+2009c044 = 2
+  EMCDynamictWR.tWR = 2
+2009c048 = 8
+  EMCDynamictRC.tRC = 8
+2009c04c = 8
+  EMCDynamictRFC.tRFC = 8
+2009c050 = 10
+  EMCDynamictXSR.tXSR = 0x10
+2009c054 = 2
+  EMCDynamictRRD.tRRD = 2
+2009c058 = 2
+  EMCDynamictMRD.tMRD = 2
+2009c020 = 183
+  EMCDynamicControl
+  CE = 1
+  CS = 1
+  I = NOP
+2009c020 = 103
+  CE = 1
+  CS = 1
+  I = PALL
+2009c024 = 42
+  EMCDynamicRefresh.REFRESH = 0x42  
+2009c020 = 83
+  CE = 1
+  CS = 1
+  I = MODE
+2009c020 = 0
+  normal
+2009c100 = 80680
+  EMCDynamicConfig0
+  AM = 13 = 256 Mb (16Mx16), 4 banks, row length = 13, column length = 9
+  B = 1
+2009c008 = 0
+
+2.16 (/CAS), 2.17 (/RAS), 2.18 (CLK0), 20 (DYCS0), 24 (CKE0), 28 (DQM0), 29 (DQM1)
+P3.0 - P3.15 (D[0-15])
+P4.0 - P4.7 (A[0-7])
+4.24 (OE), 4.25 (WE), 4.30 (/CS0)
+
+
+STATIC MEMORY:
+EMC_StaMemConfigMW(0, 8)
+EMC_StaMemConfigPB(0, 0x80)
+EMC_SetStaMemoryParameter(0, 0, 5)
+EMC_SetStaMemoryParameter(0, 1, 5)
+EMC_SetStaMemoryParameter(0, 2, 0x1f)
+EMC_SetStaMemoryParameter(0, 3, 5)
+EMC_SetStaMemoryParameter(0, 4, 0xf)
+EMC_SetStaMemoryParameter(0, 5, 0xa)
+
+only appears to have 64k of static RAM (P3.0-P3.15 enabled)
+only enabled P4.0-P4.7, P4.{24,25,30}
+
+(0x8000_0000 -> 0x8000_FFFF)
