@@ -4,6 +4,7 @@
 #include "lpc177x_8x_pinsel.h"
 #include "lpc177x_8x_gpio.h"
 #include "lpc177x_8x_emc.h"
+#include "lpc177x_8x_lcd.h"
 
 void *memcpy(char *dst, char *src, int n)
 {
@@ -132,14 +133,75 @@ void emc_setup() {
 	EMC_SetStaMemoryParameter(0, EMC_STA_MEM_WAITTURN, 0xa);
 }
 
+void lcd_setup() {
+	const LCD_Config_Type lcfg = {
+		.hConfig = { .hfp = 2, .hbp = 2, .hsw = 41, .ppl = 480 },
+		.vConfig = { .vfp = 3, .vbp = 3, .vsw = 10, .lpp = 272 },
+		.polarity = { .cpl = 480, .active_high = 1, .acb = 0, },
+		.panel_clk = 9000000,
+		.lcd_bpp = LCD_BPP_16_565Mode,
+		.lcd_type = LCD_TFT,
+		.lcd_mono8 = 0,
+		.lcd_dual = 0,
+		.big_endian_byte = 0,
+		.big_endian_pixel = 0,
+		.lcd_panel_upper = 0xA0000000,
+		.lcd_panel_lower = 0xA0000000,
+		.lcd_palette = NULL
+	};
+	LCD_Init((LCD_Config_Type *)&lcfg);
+	LCD_Enable(1);
+	
+	/* BGR565 */
+	uint16_t *vbase = (uint16_t *)0xA0000000;
+	for (int y = 0; y < 272; y++) {
+		for (int x = 0; x < 480; x++) {
+			uint8_t b = (x >> 1) ^ (y >> 1);
+			uint8_t g = x ^ y;
+			uint8_t r = (x >> 2) ^ (y >> 2);
+			
+			*vbase = (r & 0x1F) | ((g & 0x1F) << 5) | ((b & 0x1F) << 11);
+			vbase++;
+		}
+	}
+	
+	/* backlight pwm_n */
+	PINSEL_ConfigPin(2, 1, 0);
+	GPIO_SetDir(2, 1 << 1, 1);
+	GPIO_OutputValue(2, 1 << 1, 0);
+	
+	PINSEL_ConfigPin(2, 0, 0);
+	GPIO_SetDir(2, 1 << 0, 1);
+	GPIO_OutputValue(2, 1 << 0, 1);
+
+	/* backlight master enable */
+	PINSEL_ConfigPin(1, 7, 0);
+	GPIO_SetDir(1, 1 << 7, 1);
+	GPIO_OutputValue(1, 1 << 7, 1);
+}
+
 void main() {
 	GPIO_Init();
 
+	/* early init GPIO */
+	PINSEL_ConfigPin(1, 5, 0); // fan_n
+	GPIO_SetDir(1, 1 << 5, 1);
+	GPIO_OutputValue(1, 1 << 5, 1);
+	
+	PINSEL_ConfigPin(5, 0, 0);
+	GPIO_SetDir(5, 1 << 0, 1);
+	GPIO_OutputValue(5, 1 << 0, 0);
+
+	PINSEL_ConfigPin(5, 1, 0);
+	GPIO_SetDir(5, 1 << 1, 1);
+	GPIO_OutputValue(5, 1 << 1, 0);
+
+	/* LED */
 	PINSEL_ConfigPin(0, 18, 0);
 	GPIO_SetDir(0, 1 << 18, 1);
 	GPIO_OutputValue(0, 1 << 18, 1);
 
-	UART_CFG_Type ucfg = {
+	const UART_CFG_Type ucfg = {
 		.Baud_rate = 115200,
 		.Parity = UART_PARITY_NONE,
 		.Databits = UART_DATABIT_8,
@@ -160,7 +222,7 @@ void main() {
 	GPIO_SetDir(1, 1 << 18, 1);
 	GPIO_OutputValue(1, 1 << 18, 1);
 
-	UART_Init(LPC_UART0, &ucfg);
+	UART_Init(LPC_UART0, (UART_CFG_Type *)&ucfg);
 	UART_TxCmd(LPC_UART0, ENABLE);
 	
 	PINSEL_ConfigPin(0, 21, 0);
@@ -193,6 +255,10 @@ void main() {
 	puts("EMC test: ");
 	puthex(bad);
 	puts(" failures\r\n");
+	
+	puts("lighting up the LCD...\r\n");
+	lcd_setup();
+	puts("LCD setup complete\r\n");
 	
 	while(1)
 		;

@@ -1,4 +1,4 @@
-SRCS = main.c cmsis/src/core_cm3.c cmsis/src/cr_startup_lpc177x_8x.c cmsis/src/system_LPC177x_8x.c drivers/src/lpc177x_8x_uart.c drivers/src/lpc177x_8x_clkpwr.c drivers/src/lpc177x_8x_gpio.c drivers/src/lpc177x_8x_pinsel.c drivers/src/lpc177x_8x_emc.c
+SRCS = main.c cmsis/src/core_cm3.c cmsis/src/cr_startup_lpc177x_8x.c cmsis/src/system_LPC177x_8x.c drivers/src/lpc177x_8x_uart.c drivers/src/lpc177x_8x_clkpwr.c drivers/src/lpc177x_8x_gpio.c drivers/src/lpc177x_8x_pinsel.c drivers/src/lpc177x_8x_emc.c drivers/src/lpc177x_8x_lcd.c
 OUTNAME = img
 CFLAGS = -Icmsis/inc -Idrivers/inc -mcpu=cortex-m3 -mthumb -g -Os
 CROSS = arm-none-eabi-

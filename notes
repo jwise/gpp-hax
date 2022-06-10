@@ -42,8 +42,32 @@ PWM1.PWM[2] is backlight
   MR0 = 5dc
   MR2 = A bright, 3e8 dim
 
+  PINSEL_ConfigPin(2, 1, 1)
+  PWM_Init(1, PWM_MODE_TIMER, { PrescaleOption = PWM_TIMER_PRESCALE_TICKVAL, PrescaleValue = 1 })
+  PWM_MatchUpdate(0, 0, 1500, 0)
+  PWM_ChannelConfig(0, 1, 0)
+  PWM_MatchUpdate(0, 2, backlight brightness, 0)
+  PWM_ConfigMatch(0, { MatchChannel = 2, * = 0 })
+  PWM_ChannelCommand(1, 2, 1)
+  PWM_ResetCounter(1)
+  PWM_CounterCmd(1, 1)
+  PWM_Cmd(1, 1)
+
+
 PWM0.PWM[2] is beeper?
-PWM0.PWM[3] is unknown
+  PINSEL_ConfigPin(1,3,3)
+  PWM_ChannelConfig(0, 2, 0)
+  PWM_MatchUpdate(0, 2, 0x3200, 0);
+  PWM_ConfigMatch(0, { MatchChannel = 2, * = 0 })
+  PWM_ChannelCommand(0, 2, 0)
+
+PWM0.PWM[3] is fan
+  PINSEL_ConfigPin(1, 5, 3)
+  PWM_ChannelConfig(0, 3, 0)
+  PWM_MatchUpdate(0, 3, 0x639c, 0)
+  PWM_ConfigMatch(0, { MatchChannel = 1, * = 0 })
+  PWM_ChannelCommand(0, 3, 1)
+
 
 ***
 
@@ -178,3 +202,177 @@ only appears to have 64k of static RAM (P3.0-P3.15 enabled)
 only enabled P4.0-P4.7, P4.{24,25,30}
 
 (0x8000_0000 -> 0x8000_FFFF)
+
+***
+
+GPIOs:
+P0.00 UART3 TXD
+P0.01 UART3 RXD
+P0.02 UART0 TXD
+P0.03 UART0 RXD
+P0.04 LCD
+P0.05 LCD
+P0.06 LCD 
+P0.07 LCD
+P0.08 LCD
+P0.09 LCD
+P0.10 UART2 TXD
+P0.11 UART2 RXD
+P0.12 AD0[6]
+P0.13 AD0[7]
+P0.14
+P0.15 UART1 TXD
+P0.16 UART1 RXD
+P0.17
+P0.18 GPIO OUT CH1 LED
+P0.19
+P0.20 GPIO OUT CH4 LED
+P0.21 GPIO OUT CH2 LED
+P0.22
+P0.23
+P0.24 GPIO OUT CH3 LED
+P0.25
+P0.26 GPIO IN  btn
+P0.27
+P0.28
+P0.29 USB_D+1
+P0.30 USB_D-1
+P0.31
+
+P1.00 ENET_TXD0
+P1.01 ENET_TXD1
+P1.02
+P1.03 GPIO OUT ??? 0 (can be PWM0[2] in init)
+P1.04 ENET_TX_EN
+P1.05 PWM0[3] == GPIO OUT early init 1 fan_n
+P1.06 GPIO IN  early init
+P1.07 GPIO OUT ??? 1 set as 1 in gpp_pwm_init on hwver=1
+P1.08 ENET_CRS
+P1.09 ENET_RXD0
+P1.10 ENET_RXD1
+P1.11
+P1.12
+P1.13
+P1.14 ENET_RX_ER
+P1.15 ENET_RX_CLK
+P1.16 ENET_MDC
+P1.17 ENET_MDIO
+P1.18 GPIO OUT usbserial mux
+P1.19
+P1.20 LCD
+P1.21 LCD
+P1.22 LCD
+P1.23 LCD
+P1.24 LCD
+P1.25 LCD
+P1.26 LCD
+P1.27 LCD
+P1.28 LCD
+P1.29 LCD
+P1.30
+P1.31 GPIO OUT ALL ON LED
+
+P2.00 GPIO OUT lcd-related? = 1
+P2.01 PWM1[2] == GPIO OUT lcd-related? backlight?
+P2.02 LCD
+P2.03 LCD
+P2.04 LCD
+P2.05 LCD
+P2.06 LCD
+P2.07 LCD
+P2.08 LCD
+P2.09 LCD
+P2.10
+P2.11
+P2.12 LCD
+P2.13 LCD
+P2.14 GPIO IN knob
+P2.15 GPIO IN knob
+P2.16 EMC
+P2.17 EMC
+P2.18 EMC
+P2.19 GPIO OUT ? = 0
+P2.20 EMC
+P2.21 GPIO OUT ? = 0
+P2.22 SSP0 SCK
+P2.23 GPIO OUT SFLASH CS_n
+P2.24 EMC
+P2.25 GPIO OUT ? = 0
+P2.26 SSP0 MISO
+P2.27 SSP0 MOSI
+P2.28 EMC
+P2.29 EMC
+P2.30 GPIO OUT ? = 0
+P2.31 GPIO OUT ?  =0
+
+P3.00 EMC
+P3.01 EMC
+P3.02 EMC
+P3.03 EMC
+P3.04 EMC
+P3.05 EMC
+P3.06 EMC
+P3.07 EMC
+P3.08 EMC
+P3.09 EMC
+P3.10 EMC
+P3.11 EMC
+P3.12 EMC 
+P3.13 EMC
+P3.14 EMC
+P3.15 EMC
+P3.16 GPIO OUT btn
+P3.17 GPIO OUT btn
+P3.18 GPIO OUT btn
+P3.19 GPIO OUT btn
+P3.20 GPIO OUT btn
+P3.21 GPIO OUT btn
+P3.22 GPIO IN btn
+P3.23 GPIO IN btn
+P3.24 GPIO OUT ? = 1
+P3.25 GPIO OUT ? = 1
+P3.26 GPIO OUT ? = 1
+P3.27 GPIO OUT ? = 1
+P3.28 GPIO OUT ? = 1
+P3.29 GPIO IN btn
+P3.30 GPIO IN btn
+P3.31 GPIO IN btn
+
+P4.00 EMC
+P4.01 EMC
+P4.02 EMC
+P4.03 EMC
+P4.04 EMC
+P4.05 EMC
+P4.06 EMC 
+P4.07 EMC
+P4.08
+P4.09
+P4.10
+P4.11
+P4.12
+P4.13
+P4.14
+P4.15 GPIO IN  early init
+P4.16 GPIO OUT ? = 0
+P4.17 GPIO OUT ? = 0
+P4.18 GPIO OUT ? = 0
+P4.19 GPIO OUT ? = 0
+P4.20 GPIO OUT ? = 0
+P4.21 GPIO OUT ? = 0
+P4.22 GPIO IN  early init
+P4.23 GPIO IN  early init
+P4.24 EMC
+P4.25 EMC
+P4.26
+P4.27 GPIO OUT ? = 0
+P4.28 LCD
+P4.29 LCD
+P4.30 EMC
+P4.31
+
+P5.00 GPIO OUT early init 0
+P5.01 GPIO OUT early init 0
+P5.02
+P5.03
+P5.04
