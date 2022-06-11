@@ -51,13 +51,14 @@
 // defined by compiler flags for flexibility
 #define CFG_TUSB_MCU          OPT_MCU_LPC177X_8X
 #define CFG_TUSB_OS           OPT_OS_NONE
-#define CFG_TUSB_DEBUG        1
+#define CFG_TUSB_DEBUG        5
 
 // Enable Host stack
 #define CFG_TUH_ENABLED       1
 
 // Default is max speed that hardware controller could support with on-chip PHY
-#define CFG_TUH_MAX_SPEED     BOARD_TUH_MAX_SPEED
+//#define CFG_TUH_MAX_SPEED     BOARD_TUH_MAX_SPEED
+#define CFG_TUH_MAX_SPEED OPT_MODE_FULL_SPEED
 
 /* USB DMA on some MCUs can only access a specific SRAM region with restriction on alignment.
  * Tinyusb use follows macros to declare transferring memory so that they can be put
@@ -71,7 +72,7 @@
 #endif
 
 #ifndef CFG_TUSB_MEM_ALIGN
-#define CFG_TUSB_MEM_ALIGN          __attribute__ ((aligned(4)))
+#define CFG_TUSB_MEM_ALIGN          __attribute__ ((aligned(16)))
 #endif
 
 //--------------------------------------------------------------------

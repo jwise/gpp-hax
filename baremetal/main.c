@@ -1,26 +1,14 @@
 #include <stddef.h>
+#include <stdarg.h>
 
 #include "lpc177x_8x_uart.h"
 #include "lpc177x_8x_pinsel.h"
 #include "lpc177x_8x_gpio.h"
 #include "lpc177x_8x_emc.h"
 #include "lpc177x_8x_lcd.h"
+#include "lpc177x_8x_clkpwr.h"
 
-void *memcpy(char *dst, char *src, int n)
-{
-	char *dst0 = dst;
-	while (n--)
-		*(dst++) = *(src++);
-	return dst0;
-}
-
-void *memset(char *b, int c, int len)
-{
-	char *b0 = b;
-	while (len--)
-		*(b++) = c;
-	return b0;
-}
+#include "minilib.h"
 
 #define UART_USR (LPC_UART0->LSR)
 #define UART_BUF (LPC_UART0->THR)
@@ -61,6 +49,35 @@ void puthex(uint32_t p) {
         writeu(arr + (p >> 28), 1);
         p <<= 4;
     }
+}
+
+int putchar(int ch) {
+	writeu(&ch /* LE */, 1);
+	return 1;
+}
+
+void fmtputchar(void *p, char ch) {
+	putchar(ch);
+}
+
+int printf(const char *s, ...) {
+	struct fmtctx ctx;
+	
+	ctx.str = s;
+	ctx.out = fmtputchar;
+
+	va_list ap;
+	int n;
+	
+	va_start(ap, s);
+	n = fmt(&ctx, ap);
+	va_end(ap);
+	
+	return n;
+}
+
+void *malloc(size_t sz) {
+	return NULL;
 }
 
 /* We can't use the CMSIS setup routines because those map too many pins. */
@@ -180,6 +197,26 @@ void lcd_setup() {
 	GPIO_OutputValue(1, 1 << 7, 1);
 }
 
+volatile uint32_t system_ticks = 0;
+void SysTick_Handler (void)
+{
+	system_ticks++;
+}
+
+uint32_t board_millis(void)
+{
+	return system_ticks;
+}
+
+void mdelay(int ms) {
+	int starttick = system_ticks;
+	while (system_ticks < (starttick + ms))
+		;
+}
+
+extern void usb_setup();
+extern void usb_poll();
+
 void main() {
 	GPIO_Init();
 
@@ -260,6 +297,19 @@ void main() {
 	lcd_setup();
 	puts("LCD setup complete\r\n");
 	
-	while(1)
-		;
+	puts("starting up USB...\r\n");
+	usb_setup();
+	puts("USB setup complete\r\n");
+	
+	int last_flip = 0;
+	int stat = 0;
+	while(1) {
+		usb_poll();
+		if ((board_millis() - last_flip) > 500) {
+			GPIO_OutputValue(0, 1 << 21, stat);
+			stat = !stat;
+			last_flip = board_millis();
+		}
+	}
 }
+
