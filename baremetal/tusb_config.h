@@ -67,13 +67,8 @@
  * - CFG_TUSB_MEM SECTION : __attribute__ (( section(".usb_ram") ))
  * - CFG_TUSB_MEM_ALIGN   : __attribute__ ((aligned(4)))
  */
-#ifndef CFG_TUSB_MEM_SECTION
-#define CFG_TUSB_MEM_SECTION
-#endif
-
-#ifndef CFG_TUSB_MEM_ALIGN
+#define CFG_TUSB_MEM_SECTION __attribute__((section(".dram")))
 #define CFG_TUSB_MEM_ALIGN          __attribute__ ((aligned(16)))
-#endif
 
 //--------------------------------------------------------------------
 // CONFIGURATION

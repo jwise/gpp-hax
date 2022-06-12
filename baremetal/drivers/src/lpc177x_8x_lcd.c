@@ -46,8 +46,9 @@ uint32_t lcd_cursor_base_addr = 0;
 uint32_t lcd_cursor_size = 64;
 LCD_Config_Type  lcd_config;
 static uint8_t bits_per_pixel[] = {  1, 2, 4, 8, 16, 32, 16, 16  };
+#if 0
 uint32_t rect[1024];
-
+#endif
 
 static void LCD_SetHorizontalTiming(LCD_HConfig_Type* pConfig);
 static void LCD_SetVertialTiming(LCD_VConfig_Type* pConfig);
@@ -516,6 +517,7 @@ void LCD_LoadPic (LCD_PANEL panel, uint32_t X_Left, uint32_t Y_Up,
   }
 }
 
+#if 0
 /*********************************************************************//**
  * @brief		Fill a rectangle.
  *
@@ -596,6 +598,7 @@ void LCD_FillRect (LCD_PANEL panel, uint32_t startx,uint32_t endx,
 
    
 }
+#endif
 
 /*********************************************************************//**
  * @brief		Configure display of cursor.

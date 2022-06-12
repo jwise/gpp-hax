@@ -1,6 +1,6 @@
 #pragma once
 
-#define __BSS(x)
+#define __BSS(x)__attribute__ ((section(".dram")))
 #define INLINE inline
 
 #include "LPC177x_8x.h"

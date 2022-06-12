@@ -8,6 +8,8 @@ MEMORY
   rom (rx)  : ORIGIN = 0x0000A000, LENGTH = 0x76000 - 4
   ram (rwx) : ORIGIN = 0x10000000, LENGTH =  64K
   ahb_sram_0 (rwx) : ORIGIN = 0x20000000, LENGTH =  32K
+  dram (rwx) : ORIGIN = 0xA0000000, LENGTH =  16M
+
 }
 
 EXTERN(g_pfnVectors)
@@ -88,6 +90,18 @@ SECTIONS
     _etext = .;
   } >rom
 
+  .data.dram :
+  {
+    . = ALIGN(8);
+    _data_dram = .;
+    *(.data.dram);
+    . = ALIGN(8);
+    _edata_dram = .;
+  } >dram AT>rom
+  __dram_src  = LOADADDR(.data.dram);
+  __dram_dest =     ADDR(.data.dram);
+  __dram_size =   SIZEOF(.data.dram);
+
   .data :
   {
     _data = .;
@@ -100,21 +114,35 @@ SECTIONS
     . = ALIGN (8);
     _edata = .;
   } >ram AT>rom
-  .bss :
+  __data_src  = LOADADDR(.data);
+  __data_dest =     ADDR(.data);
+  __data_size =   SIZEOF(.data);
+
+  .bss.dram (NOLOAD) :
+  {
+    __dram_bss = .;
+    *(.dram)
+    *(.bss.dram)
+    __dram_ebss = .;
+  } >dram
+
+  .bss (NOLOAD) :
   {
     _bss = .;
+    __bss_start__ = .;
     *(.shbss)
     *(.bss SORT_BY_ALIGNMENT(.bss.*) .gnu.linkonce.b.*)
     *(COMMON)
     *(.ram.b)
     . = ALIGN (8);
     _ebss = .;
-  } >ram AT>rom
+    __bss_end__ = .;
+  } >ram
   .heap :
   {
     *(.heap)
   } >ram
-  .stack :
+  .stack (NOLOAD) :
   {
     . = ALIGN(8);
     . += stack_size;
@@ -123,7 +151,6 @@ SECTIONS
 
   _end = .;
   __end = .;
-
 
   .stab 0 (NOLOAD) : { *(.stab) }
   .stabstr 0 (NOLOAD) : { *(.stabstr) }

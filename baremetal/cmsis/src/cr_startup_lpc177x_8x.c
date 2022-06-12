@@ -51,6 +51,8 @@ extern "C" {
 #include "LPC177x_8x.h"
 #endif
 
+#include <string.h>
+
 //*****************************************************************************
 #if defined (__cplusplus)
 extern "C" {
@@ -221,29 +223,6 @@ void (* const g_pfnVectors[])(void) = {
 
 };
 
-//*****************************************************************************
-// Functions to carry out the initialization of RW and BSS data sections. These
-// are written as separate functions rather than being inlined within the
-// ResetISR() function in order to cope with MCUs with multiple banks of
-// memory.
-//*****************************************************************************
-__attribute__ ((section(".after_vectors")))
-void data_init(unsigned int romstart, unsigned int start, unsigned int len) {
-	unsigned int *pulDest = (unsigned int*) start;
-	unsigned int *pulSrc = (unsigned int*) romstart;
-	unsigned int loop;
-	for (loop = 0; loop < len; loop = loop + 4)
-		*pulDest++ = *pulSrc++;
-}
-
-__attribute__ ((section(".after_vectors")))
-void bss_init(unsigned int start, unsigned int len) {
-	unsigned int *pulDest = (unsigned int*) start;
-	unsigned int loop;
-	for (loop = 0; loop < len; loop = loop + 4)
-		*pulDest++ = 0;
-}
-
 extern unsigned int _etext;
 extern unsigned int _data;
 extern unsigned int _edata;
@@ -266,21 +245,9 @@ ResetISR(void) {
 	GPIO_SetDir(0, 1 << 20, 1);
 	GPIO_OutputValue(0, 1 << 20, 1);
 
-	// Use Old Style Data and BSS section initialization.
-	// This will only initialize a single RAM bank.
-	unsigned int * LoadAddr, *ExeAddr, *EndAddr, SectionLen;
-
-    // Copy the data segment from flash to SRAM.
-	LoadAddr = &_etext;
-	ExeAddr = &_data;
-	EndAddr = &_edata;
-	SectionLen = (void*)EndAddr - (void*)ExeAddr;
-	data_init((unsigned int)LoadAddr, (unsigned int)ExeAddr, SectionLen);
-	// Zero fill the bss segment
-	ExeAddr = &_bss;
-	EndAddr = &_ebss;
-	SectionLen = (void*)EndAddr - (void*)ExeAddr;
-	bss_init ((unsigned int)ExeAddr, SectionLen);
+	extern char __data_src, __data_dest, __data_size;
+	memcpy(&__data_dest, &__data_src, (uint32_t)&__data_size);
+	memset(&_bss, 0, ((uint32_t)&_ebss) - (uint32_t)&_bss);
 
 	SystemInit();
 
@@ -303,6 +270,7 @@ void irq()
 	PINSEL_ConfigPin(1, 31, 0);
 	GPIO_SetDir(1, 1 << 31, 1);
 	GPIO_OutputValue(1, 1 << 31, 1);
+	putchar('!');
 	puts("IRQ\r\n");
 }
 

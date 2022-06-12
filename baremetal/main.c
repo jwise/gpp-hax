@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdarg.h>
+#include <string.h>
 
 #include "lpc177x_8x_uart.h"
 #include "lpc177x_8x_pinsel.h"
@@ -8,76 +9,12 @@
 #include "lpc177x_8x_lcd.h"
 #include "lpc177x_8x_clkpwr.h"
 
-#include "minilib.h"
-
-#define UART_USR (LPC_UART0->LSR)
-#define UART_BUF (LPC_UART0->THR)
-
-void readu(void *_p, size_t n) {
-    uint8_t *p = _p;
-    while (n) {
-        while (!(UART_USR & UART_LSR_RDR))
-            ;
-        *p = UART_BUF;
-        p++;
-        n--;
-    }
-}
-
-void writeu(const void *_p, size_t n) {
-    const uint8_t *p = _p;
-    while (n) {
-        while (!(UART_USR & UART_LSR_THRE))
-            ;
-        UART_BUF = *p;
-        p++;
-        n--;
-    }
-}
-
-int puts(const char *c) {
-    while (*c) {
-        writeu((uint8_t *)c, 1);
-        c++;
-    }
-    return 0;
-}
-
 void puthex(uint32_t p) {
     const char *arr = "0123456789abcdef";
     for (int i = 0; i < 8; i++) {
-        writeu(arr + (p >> 28), 1);
+        write(1, arr + (p >> 28), 1);
         p <<= 4;
     }
-}
-
-int putchar(int ch) {
-	writeu(&ch /* LE */, 1);
-	return 1;
-}
-
-void fmtputchar(void *p, char ch) {
-	putchar(ch);
-}
-
-int printf(const char *s, ...) {
-	struct fmtctx ctx;
-	
-	ctx.str = s;
-	ctx.out = fmtputchar;
-
-	va_list ap;
-	int n;
-	
-	va_start(ap, s);
-	n = fmt(&ctx, ap);
-	va_end(ap);
-	
-	return n;
-}
-
-void *malloc(size_t sz) {
-	return NULL;
 }
 
 /* We can't use the CMSIS setup routines because those map too many pins. */
@@ -150,6 +87,8 @@ void emc_setup() {
 	EMC_SetStaMemoryParameter(0, EMC_STA_MEM_WAITTURN, 0xa);
 }
 
+uint16_t lcd_fb[480*272] __attribute__((section(".dram"))) __attribute__((aligned(8)));
+
 void lcd_setup() {
 	const LCD_Config_Type lcfg = {
 		.hConfig = { .hfp = 2, .hbp = 2, .hsw = 41, .ppl = 480 },
@@ -162,15 +101,15 @@ void lcd_setup() {
 		.lcd_dual = 0,
 		.big_endian_byte = 0,
 		.big_endian_pixel = 0,
-		.lcd_panel_upper = 0xA0000000,
-		.lcd_panel_lower = 0xA0000000,
+		.lcd_panel_upper = lcd_fb,
+		.lcd_panel_lower = lcd_fb,
 		.lcd_palette = NULL
 	};
 	LCD_Init((LCD_Config_Type *)&lcfg);
 	LCD_Enable(1);
 	
 	/* BGR565 */
-	uint16_t *vbase = (uint16_t *)0xA0000000;
+	uint16_t *vbase = (uint16_t *)lcd_fb;
 	for (int y = 0; y < 272; y++) {
 		for (int x = 0; x < 480; x++) {
 			uint8_t b = (x >> 1) ^ (y >> 1);
@@ -214,6 +153,7 @@ void mdelay(int ms) {
 		;
 }
 
+extern void debug_setup();
 extern void usb_setup();
 extern void usb_poll();
 
@@ -238,71 +178,34 @@ void main() {
 	GPIO_SetDir(0, 1 << 18, 1);
 	GPIO_OutputValue(0, 1 << 18, 1);
 
-	const UART_CFG_Type ucfg = {
-		.Baud_rate = 115200,
-		.Parity = UART_PARITY_NONE,
-		.Databits = UART_DATABIT_8,
-		.Stopbits = UART_STOPBIT_1
-	};
-	
-	/* UART0 connect */
-	PINSEL_ConfigPin(0, 0, 2);
-	PINSEL_ConfigPin(0, 1, 2);
-	PINSEL_ConfigPin(0, 2, 1);
-	PINSEL_ConfigPin(0, 3, 1);
-//	PINSEL_SetPinMode(0, 0, PINSEL_BASICMODE_PLAINOUT);
-//	PINSEL_SetPinMode(0, 1, PINSEL_BASICMODE_PLAINOUT);
-	
-	/* USB/serial mux */
-	PINSEL_ConfigPin(1, 18, 0);
-//	PINSEL_SetPinMode(1, 18, PINSEL_BASICMODE_PLAINOUT);
-	GPIO_SetDir(1, 1 << 18, 1);
-	GPIO_OutputValue(1, 1 << 18, 1);
+	emc_setup();
+	extern char __dram_src, __dram_dest, __dram_size, __dram_bss, __dram_ebss;
+	memcpy(&__dram_dest, &__dram_src, (uint32_t)&__dram_size);
+	memset(&__dram_bss, 0, ((uint32_t)&__dram_ebss) - (uint32_t)&__dram_bss);
 
-	UART_Init(LPC_UART0, (UART_CFG_Type *)&ucfg);
-	UART_TxCmd(LPC_UART0, ENABLE);
+	debug_setup();
 	
 	PINSEL_ConfigPin(0, 21, 0);
 	GPIO_SetDir(0, 1 << 21, 1);
 	GPIO_OutputValue(0, 1 << 21, 1);
 	
-	puts("hello from before we turn on emc\r\n");
-	emc_setup();
+	extern int myargc, _bss, _ebss;
+	printf("myargc %d, myargc %08x, bss %08x, _ebss %08x\n", myargc, &myargc, &_bss, &_ebss);
 	
-	puts("writing to EMC...\r\n");
-	volatile uint32_t *extram = (uint32_t *)0xa0000000;
-	for (int i = 0; i < 8*1024*1024 / 4; i++) {
-		extram[i] = i; 
-	}
+	puts("EMC is awake");
 	
-	puts("reading from EMC...\r\n");
-	int bad = 0;
-	for (int i = 0; i < 8*1024*1024 / 4; i++) {
-		if (extram[i] != i) {
-			bad++;
-			if (bad == 1) {
-				puts("EMC failure: ");
-				puthex(i);
-				puts(" == ");
-				puthex(extram[i]);
-				puts("\r\n");
-			}
-		}
-	}
-	puts("EMC test: ");
-	puthex(bad);
-	puts(" failures\r\n");
-	
-	puts("lighting up the LCD...\r\n");
+	puts("lighting up the LCD...");
 	lcd_setup();
-	puts("LCD setup complete\r\n");
+	puts("LCD setup complete");
 	
-	puts("starting up USB...\r\n");
+	puts("starting up USB...");
 	usb_setup();
-	puts("USB setup complete\r\n");
+	puts("USB setup complete");
 	
 	int last_flip = 0;
 	int stat = 0;
+	extern void D_DoomMain (void);
+	D_DoomMain();
 	while(1) {
 		usb_poll();
 		if ((board_millis() - last_flip) > 500) {
@@ -312,4 +215,3 @@ void main() {
 		}
 	}
 }
-

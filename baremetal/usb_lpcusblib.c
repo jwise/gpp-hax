@@ -27,19 +27,29 @@ static USB_ClassInfo_MS_Host_t FlashDisk_MS_Interface = {
 void usb_setup() {
 	SysTick_Config(SystemCoreClock / 1000);
 	CLKPWR_ConfigPPWR(CLKPWR_PCONP_PCUSB, ENABLE);
+	LPC_SC->RSTCON0 |= (1 << 31);
+	for (int i = 0; i < 4000; i++)
+		asm volatile("nop");
+	LPC_SC->RSTCON0 &= ~(1 << 31);
+
 	LPC_USB->OTGClkCtrl = 0x19; /* AHB_CLK | HOST_CLK | OTG_CLK */
 	while ((LPC_USB->OTGClkSt & 0x19) != 0x19)
 		;
 	LPC_USB->OTGStCtrl = 1; /* U1 = U2 = host */
 	PINSEL_ConfigPin(0, 29, 1);
 	PINSEL_ConfigPin(0, 30, 1);
-	puts("starting stack...\r\n");
+	puts("starting stack...");
 	__enable_irq();
 	USB_Init(0, USB_MODE_Host);
-	puts("stack is alive\r\n");
+	puts("stack is alive, waiting for disk");
+	USBDisk_Init();
+	fatfs_mount(0);
+	puts("disk attached -- continuing boot");
 }
 
 void usb_poll() {
+	USB_USBTask(0, USB_MODE_Host);
+	MS_Host_USBTask(&FlashDisk_MS_Interface);
 }
 
 extern void HcdIrqHandler(uint8_t HostID);
@@ -49,9 +59,7 @@ void USB_IRQHandler(void)
 	PINSEL_ConfigPin(1, 31, 0);
 	GPIO_SetDir(1, 1 << 31, 1);
 	GPIO_OutputValue(1, 1 << 31, 1);
-	printf("pre:  UsbIntSt %08x; HcInterruptStatus %08x\r\n", LPC_SC->USBIntSt, LPC_USB->HcInterruptStatus);
 	HcdIrqHandler(0);
-	printf("post: UsbIntSt %08x; HcInterruptStatus %08x\r\n", LPC_SC->USBIntSt, LPC_USB->HcInterruptStatus);
 	GPIO_OutputValue(1, 1 << 31, 0);
 }
 
@@ -203,3 +211,73 @@ void EVENT_USB_Host_DeviceEnumerationFailed(const uint8_t corenum,
 			 corenum, ErrorCode, SubErrorCode, USB_HostState[corenum]);
 
 }
+
+static SCSI_Capacity_t DiskCapacity;
+
+void USBDisk_Init(void) {
+	while (USB_HostState[0] != HOST_STATE_Configured) {
+		MS_Host_USBTask(&FlashDisk_MS_Interface);
+		USB_USBTask(FlashDisk_MS_Interface.Config.PortNumber, USB_MODE_Host);
+	}
+}
+
+uint8_t USBDrive_CheckMedia(void) {
+	static int _init_done = 0;
+	
+	if (_init_done)
+		return 1;
+
+	printf("Waiting for USB ready...\r\n");
+	while (!MS_Host_TestUnitReady(&FlashDisk_MS_Interface, 0))
+		;
+	MS_Host_ReadDeviceCapacity(&FlashDisk_MS_Interface, 0, &DiskCapacity);
+	_init_done = 1;
+	
+	return 1;
+}
+
+int USB_disk_initialize(void) {
+	USBDrive_CheckMedia();
+	return 0;
+}
+
+int USB_disk_status(void) {
+	USBDrive_CheckMedia();
+	return 0;
+}
+
+int USB_disk_read(uint8_t *buff, uint32_t sector, uint8_t count) {
+	return MS_Host_ReadDeviceBlocks(&FlashDisk_MS_Interface, 0, sector, count, DiskCapacity.BlockSize, buff);
+}
+
+
+//--------------------------------------------------------------
+// WRITE-Funktion
+// Return Wert :
+//    0 = alles ok
+//  < 0 = Fehler
+//--------------------------------------------------------------
+int USB_disk_write(const uint8_t *buff, uint32_t sector, uint8_t count) {
+	return MS_Host_WriteDeviceBlocks(&FlashDisk_MS_Interface, 0, sector, count, DiskCapacity.BlockSize, buff);
+}
+
+#include "diskio.h"
+int USB_disk_ioctl(uint8_t cmd, void *buff) {
+	switch (cmd) {    
+	case GET_SECTOR_COUNT :  // Get number of sectors on the disk (uint32_t)
+		*(uint32_t*)buff = DiskCapacity.Blocks;
+		return 0;
+	case GET_SECTOR_SIZE :   // Get R/W sector size (WORD)
+		*(uint16_t*)buff = DiskCapacity.BlockSize;
+		return 0;
+	case GET_BLOCK_SIZE :    // Get erase block size in unit of sector (uint32_t)
+		*(uint32_t*)buff = 1;
+		return 0;
+	case CTRL_SYNC :         // Make sure that no pending write process
+		return 0;
+	}
+  
+	return -1;
+}
+
+
