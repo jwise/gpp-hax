@@ -354,11 +354,11 @@ P4.12
 P4.13
 P4.14
 P4.15 GPIO IN  early init
-P4.16 GPIO OUT ? = 0
-P4.17 GPIO OUT ? = 0
-P4.18 GPIO OUT ? = 0
-P4.19 GPIO OUT ? = 0
-P4.20 GPIO OUT ? = 0
+P4.16 GPIO OUT ? = 0 channel_gpio_0
+P4.17 GPIO OUT ? = 0 channel_gpio_1
+P4.18 GPIO OUT ? = 0 channel_gpio_2
+P4.19 GPIO OUT ? = 0 channel_gpio_3
+P4.20 GPIO OUT ? = 0 channel_reset
 P4.21 GPIO OUT ? = 0
 P4.22 GPIO IN  early init
 P4.23 GPIO IN  early init
@@ -376,3 +376,46 @@ P5.01 GPIO OUT early init 0
 P5.02
 P5.03 UART4 RXD
 P5.04 UART4 TXD
+
+***
+
+channel init sequence:
+
+start at 19200 baud
+set gpio_channel_reset_maybe = 0
+
+send 0x08
+
+expect: 15 bytes product ID, 3 bytes hw and fw vers, 4 spaces, \r\n
+DuC7060   -62 I31
+
+send 07 0E 05  52  00 00 00 00 A9
+     sync  len cmd data....... cksm
+
+CMD = boot into normal FW
+
+expect: \x06
+ 
+see AN-724
+
+channel reset sequence:
+
+channel_gpio_set(param_1)
+spin(3M)
+set channel_reset
+spin(3M)
+clear channel_reset
+spin(3M)
+channel_gpio_clr(param_1)
+
+
+channel ready sequence:
+
+channel_gpio_set(param_1)
+spin(3M)
+channel_gpio_clr(param_1)
+spin(3M)
+set channel_reset
+spin(3M)
+clear channel_reset
+spin(3M)
