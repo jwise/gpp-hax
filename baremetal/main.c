@@ -8,6 +8,7 @@
 #include "lpc177x_8x_emc.h"
 #include "lpc177x_8x_lcd.h"
 #include "lpc177x_8x_clkpwr.h"
+#include "lpc177x_8x_pwm.h"
 
 void puthex(uint32_t p) {
     const char *arr = "0123456789abcdef";
@@ -157,6 +158,30 @@ extern void debug_setup();
 extern void usb_setup();
 extern void usb_poll();
 
+uint8_t pwmbuf[8192];
+volatile uint32_t pwm_consp = 0;
+volatile uint32_t pwm_prodp = 0;
+uint32_t samples = 0;
+
+uint16_t vidbuf[8192] __attribute__((section(".dram"))) __attribute__((aligned(8)));
+uint32_t vid_consp = 0;
+uint32_t vid_prodp = 0;
+
+void PWM0_IRQHandler(void) {
+	LPC_PWM0->IR = PWM_INTSTAT_MR0; /* do this immediately, lest we get a double IRQ */
+	LPC_PWM0->MR2 = pwmbuf[pwm_consp] * (4096 / 256);
+	LPC_PWM0->LER = PWM_LER_EN_MATCHn_LATCH(2);
+	if (pwm_consp != pwm_prodp)
+		pwm_consp++;
+	if (pwm_consp > sizeof(pwmbuf))
+		pwm_consp = 0;
+	samples++;
+}
+
+#include "ff.h"
+
+#define AUDIO_HZ 14648
+
 void main() {
 	GPIO_Init();
 
@@ -190,10 +215,10 @@ void main() {
 	GPIO_OutputValue(0, 1 << 21, 1);
 	
 	extern int myargc, _bss, _ebss;
-	printf("myargc %d, myargc %08x, bss %08x, _ebss %08x\n", myargc, &myargc, &_bss, &_ebss);
+	printf("periclk %d, myargc %d, myargc %08x, bss %08x, _ebss %08x\n", CLKPWR_GetCLK(CLKPWR_CLKTYPE_PER), myargc, &myargc, &_bss, &_ebss);
 	
 	puts("EMC is awake");
-	
+
 	puts("lighting up the LCD...");
 	lcd_setup();
 	puts("LCD setup complete");
@@ -201,6 +226,93 @@ void main() {
 	puts("starting up USB...");
 	usb_setup();
 	puts("USB setup complete");
+	
+	puts("setting up PWM...");
+	PINSEL_ConfigPin(1, 3, 3);
+	const static PWM_TIMERCFG_Type timercfg = {
+		.PrescaleOption = PWM_TIMER_PRESCALE_TICKVAL,
+		.PrescaleValue = 1 /* per_clk = 60MHz */
+	};
+	PWM_Init(0, PWM_MODE_TIMER, (void *)&timercfg);
+	PWM_ChannelConfig(0, 2, PWM_CHANNEL_SINGLE_EDGE);
+	PWM_MatchUpdate(0, 0, 4096, PWM_MATCH_UPDATE_NOW); /* 14648.438 Hz */
+	PWM_MatchUpdate(0, 2, 0, PWM_MATCH_UPDATE_NOW);
+	const static PWM_MATCHCFG_Type match0 = {
+		.MatchChannel = 0,
+		.IntOnMatch = ENABLE,
+		.StopOnMatch = DISABLE,
+		.ResetOnMatch = ENABLE,
+	};
+	PWM_ConfigMatch(0, (PWM_MATCHCFG_Type *)&match0);
+	const static PWM_MATCHCFG_Type match2 = {
+		.MatchChannel = 2,
+		.IntOnMatch = DISABLE,
+		.StopOnMatch = DISABLE,
+		.ResetOnMatch = DISABLE,
+	};
+	PWM_ConfigMatch(0, (PWM_MATCHCFG_Type *)&match2);
+
+	PWM_ResetCounter(0);
+	PWM_CounterCmd(0, ENABLE);
+	PWM_ChannelCmd(0, 2, ENABLE);
+	NVIC_EnableIRQ(PWM0_IRQn);
+	puts("PWM init complete");
+	
+	FIL afile, vfile;
+	if (f_open(&afile, "0:/audio.u8", FA_OPEN_EXISTING | FA_READ) != FR_OK) {
+		puts("failed to open audio.u8");
+	}
+	if (f_open(&vfile, "0:/video.rle", FA_OPEN_EXISTING | FA_READ) != FR_OK) {
+		puts("failed to open video.rle");
+	}
+	
+	uint16_t next_words;
+	int rdrv;
+	f_readn(&vfile, &next_words, 2, &rdrv);
+	
+	PWM_Cmd(0, ENABLE);
+	int starttime = board_millis();
+	int frameno = 0;
+	const int FPS = 23;
+	while(1) {
+		if ((pwm_prodp + 8192 - pwm_consp) % 8192 < 4096) {
+			int maxn = 8192 - pwm_prodp;
+			if (maxn > 4096)
+				maxn = 4096;
+			int n;
+			f_readn(&afile, pwmbuf + pwm_prodp, maxn, &n);
+			//printf("%d %d\n", pwm_prodp, n);
+			pwm_prodp = (pwm_prodp + n) % 8192;
+			if (n == 0)
+				break;
+		}
+
+		if ((samples / (14648 / FPS)) > frameno) {
+			frameno++;
+			
+			if (next_words == 0)
+				break;
+			vidbuf[0] = next_words;
+			f_readn(&vfile, vidbuf + 1, next_words * 2 + 4, &rdrv);
+			if (rdrv == next_words * 2 + 4) {
+				next_words = vidbuf[2 + next_words];
+			} else {
+				next_words = 0;
+			}
+			
+			uint16_t *obuf = lcd_fb;
+			uint16_t n = vidbuf[0];
+			uint16_t stat = vidbuf[1];
+			for (int i = 0; i < vidbuf[0]; i++) {
+				uint16_t len = vidbuf[i + 2];
+				memset(obuf, stat ? 0xFF : 0x00, len * 2);
+				obuf += len;
+				stat = !stat;
+			}
+		}
+		//printf("%d %d.", pwm_prodp, pwm_consp);
+	}
+	puts("done");
 	
 	int last_flip = 0;
 	int stat = 0;
