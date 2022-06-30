@@ -1,11 +1,30 @@
+100000 + 1000 * x: trigger config (magic 0xaa55275a)
+
 200000: upgrade trigger region (bootloader looks at 0x276f00 to see if it is time to upgrade)
 201000: upgrade content region
 
-400000: logo splash
-6c0000: 0x27878 NUM.BIN
-680000: 0x2feb0 HZ12.BIN ("CHIN")
-714000: 0x3700 from 0x1000466c
+400000: GWS logo splash
+432000: comm settings (magic 0xaa555aa5)
+480000: ODM splash buffer (magic 0xaa55005a)
 
-70x000: 0x80-byte blocks of data (gppsta structures?)
+500000 + 8000 * x: seq config (0xaa55265a
+
+580000 + 4000 * x: delay config (magic 0x55aad9a5)
+
+5c0000: GPPSetLoad (0x55aaffa5) (gpp_set)
+
+5e0000 + 1000 * x: monitor config (magic 0xaa55265a)
+
+600000: gpprcdinfo (aa55265a)
+608000 + 8000 * x: gppmemload (magic -0x55aad9a6)
+
+680000: 0x2feb0 HZ12.BIN ("CHIN" / LC12)
+6c0000: 0x27878 NUM.BIN
+
+70x000: 0x80-byte blocks of data (gppsta_persist? aa55a55a)
+
+714000: 0x3700 from 0x1000466c (channel calibration buffer? aa55ff5a)
+
+7ff000: hwver (0 or 1)
 
 memcpy(0x73018, 0x10000000, 0x4654)

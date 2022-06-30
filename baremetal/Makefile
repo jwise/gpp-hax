@@ -1,6 +1,6 @@
 SRCS = main.c stubs.c
 
-SRCS += cmsis/src/core_cm3.c cmsis/src/cr_startup_lpc177x_8x.c cmsis/src/system_LPC177x_8x.c drivers/src/lpc177x_8x_uart.c drivers/src/lpc177x_8x_clkpwr.c drivers/src/lpc177x_8x_gpio.c drivers/src/lpc177x_8x_pinsel.c drivers/src/lpc177x_8x_emc.c drivers/src/lpc177x_8x_lcd.c drivers/src/lpc177x_8x_pwm.c
+SRCS += cmsis/src/core_cm3.c cmsis/src/cr_startup_lpc177x_8x.c cmsis/src/system_LPC177x_8x.c drivers/src/lpc177x_8x_uart.c drivers/src/lpc177x_8x_clkpwr.c drivers/src/lpc177x_8x_gpio.c drivers/src/lpc177x_8x_pinsel.c drivers/src/lpc177x_8x_emc.c drivers/src/lpc177x_8x_lcd.c drivers/src/lpc177x_8x_pwm.c drivers/src/lpc177x_8x_ssp.c
 
 #SRCS_USB = usb_tinyusb.c tinyusb/src/class/msc/msc_host.c tinyusb/src/common/*.c tinyusb/src/host/*.c tinyusb-shim/hcd_lpc17_40.c tinyusb/src/tusb.c tinyusb/src/portable/ohci/ohci.c
 SRCS_USB = usb_lpcusblib.c lpcusblib/Drivers/USB/Core/*.c lpcusblib/Drivers/USB/Core/HCD/*.c lpcusblib/Drivers/USB/Core/HCD/OHCI/*.c lpcusblib/Drivers/USB/Class/Host/*.c lpcusblib/Drivers/USB/Class/Common/*.c

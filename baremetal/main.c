@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "lpc177x_8x_uart.h"
 #include "lpc177x_8x_pinsel.h"
@@ -9,6 +10,9 @@
 #include "lpc177x_8x_lcd.h"
 #include "lpc177x_8x_clkpwr.h"
 #include "lpc177x_8x_pwm.h"
+#include "lpc177x_8x_ssp.h"
+
+#include "ff.h"
 
 void puthex(uint32_t p) {
     const char *arr = "0123456789abcdef";
@@ -88,6 +92,78 @@ void emc_setup() {
 	EMC_SetStaMemoryParameter(0, EMC_STA_MEM_WAITTURN, 0xa);
 }
 
+void sflash_setup() {
+	PINSEL_ConfigPin(2, 23, 0);
+	GPIO_OutputValue(2, 1 << 23, 1);
+	GPIO_SetDir(2, 1 << 23, 1);
+	
+	PINSEL_ConfigPin(2, 22, 2); /* SSP0 SCK */
+	PINSEL_ConfigPin(2, 26, 2); /* SSP0 MISO */
+	PINSEL_ConfigPin(2, 27, 2); /* SSP0 MOSI */
+	
+	SSP_CFG_Type cfg;
+	SSP_ConfigStructInit(&cfg);
+	SSP_Init(LPC_SSP0, &cfg);
+	SSP_Cmd(LPC_SSP0, ENABLE);
+	
+	GPIO_OutputValue(2, 1 << 23, 0);
+	for (int i = 0; i < 0x100; i++)
+		asm volatile("nop");
+	SSP_DATA_SETUP_Type setup = {};
+	uint8_t dout[4] = { 0x9F, 0xA9, 0xA9, 0xA9 };
+	uint8_t din [4];
+	setup.tx_data = dout;
+	setup.rx_data = din ;
+	setup.length = 4;
+	SSP_ReadWrite(LPC_SSP0, &setup, SSP_TRANSFER_POLLING);
+	GPIO_OutputValue(2, 1 << 23, 1);
+	for (int i = 0; i < 0x100; i++)
+		asm volatile("nop");
+	
+	printf("SPI FLASH IDCODE: %02x %02x %02x\n", din[1], din[2], din[3]);
+}
+
+void sflash_read(uint32_t ad, uint8_t *da, uint32_t len) {
+	GPIO_OutputValue(2, 1 << 23, 0);
+	for (int i = 0; i < 0x100; i++)
+		asm volatile("nop");
+	SSP_DATA_SETUP_Type setup = {};
+	uint8_t dout[4] = { 0x03, (ad >> 16) & 0xFF, (ad >> 8) & 0xFF, ad & 0xFF };
+	setup.tx_data = dout;
+	setup.rx_data = NULL;
+	setup.length = 4;
+	SSP_ReadWrite(LPC_SSP0, &setup, SSP_TRANSFER_POLLING);
+	setup.tx_data = NULL;
+	setup.rx_data = da;
+	setup.length = len;
+	SSP_ReadWrite(LPC_SSP0, &setup, SSP_TRANSFER_POLLING);
+	GPIO_OutputValue(2, 1 << 23, 1);
+	for (int i = 0; i < 0x100; i++)
+		asm volatile("nop");
+}
+
+void sflash_dump() {
+	static uint8_t buf[4096];
+	
+	FIL file;
+	unsigned long c;
+	if (f_open(&file, "0:/sflash.bin", FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
+		puts("failed to open sflash.bin");
+		return;
+	}
+	printf("writing to USB...\n");
+	for (int i = 0; i < 8*1024*1024; i += 4096) {
+		sflash_read(i, buf, 4096);
+		f_writen(&file, buf, 4096, &c);
+		if ((i % 512*1024) == 0) {
+			printf("%d\r", i);
+			fflush(stdout);
+		}
+	}
+	printf("\ndone\n");
+	f_close(&file);
+}
+
 uint16_t lcd_fb[480*272] __attribute__((section(".dram"))) __attribute__((aligned(8)));
 
 void lcd_setup() {
@@ -134,7 +210,11 @@ void lcd_setup() {
 	/* backlight master enable */
 	PINSEL_ConfigPin(1, 7, 0);
 	GPIO_SetDir(1, 1 << 7, 1);
+#ifdef REVA
+	GPIO_OutputValue(1, 1 << 7, 0);
+#else
 	GPIO_OutputValue(1, 1 << 7, 1);
+#endif
 }
 
 volatile uint32_t system_ticks = 0;
@@ -178,7 +258,6 @@ void PWM0_IRQHandler(void) {
 	samples++;
 }
 
-#include "ff.h"
 
 #define AUDIO_HZ 14648
 
@@ -227,6 +306,11 @@ void main() {
 	usb_setup();
 	puts("USB setup complete");
 	
+	puts("starting up SPI flash...");
+	sflash_setup();
+	sflash_dump();
+	puts("SFLASH done");
+	
 	puts("setting up PWM...");
 	PINSEL_ConfigPin(1, 3, 3);
 	const static PWM_TIMERCFG_Type timercfg = {
@@ -267,7 +351,7 @@ void main() {
 	}
 	
 	uint16_t next_words;
-	int rdrv;
+	long rdrv;
 	f_readn(&vfile, &next_words, 2, &rdrv);
 	
 	PWM_Cmd(0, ENABLE);
@@ -279,7 +363,7 @@ void main() {
 			int maxn = 8192 - pwm_prodp;
 			if (maxn > 4096)
 				maxn = 4096;
-			int n;
+			long n;
 			f_readn(&afile, pwmbuf + pwm_prodp, maxn, &n);
 			//printf("%d %d\n", pwm_prodp, n);
 			pwm_prodp = (pwm_prodp + n) % 8192;

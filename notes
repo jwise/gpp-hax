@@ -419,3 +419,113 @@ set channel_reset
 spin(3M)
 clear channel_reset
 spin(3M)
+
+***
+
+UART PROTOCOL:
+
+Note: FF and 00 are illegal!  Discard them!
+
+status you can receive:
+
+E3: "I am in constant current"
+E4: "I am in constant voltage"
+
+multi-byte format:
+
+AAAAAAAA BBBBBBBB CCCCCCCC DDDDDDDD
+       *  *******  *******  *******
+
+A[7:1] = cmd (mask off A[0])
+
+data = {A[0],B[6:0],C[6:0],D[6:0]}
+
+allowed responses:
+
+0xAE: VADC
+0xB2: IADC
+0xBE: goes directly into array 0x140, part of GPPSDPChck -- version number?  should be 0x2e9bd
+
+2f0fa has an interesting chunk of update code that updates some globals onto screen
+
+
+
+TX protocol:
+
+0xAC: comes from 2f632 and from a struct, what else?
+readback in 2f666
+
+0xB0: 2f692, readback in 2f6c6
+
+set up in 3b6b8 -- B0 is cal_apply(chan, 2, 0, CAL_VOUT, vout_mv * 100)
+AC is cal_apply(chan, 1, 0, CAL_IOUT, vout_mv * param_2 * 10)
+
+also AC in 3dfd0
+B0 in 3db84
+
+INIT SEQUENCE (channel_send_init_cmds):
+
+D0 / D1 / D2 / D3: set channel ID
+[ never used internally to channel ]
+
+D4/D5: something
+[ stored inside channel ]
+
+D9/D8: something else
+[ stored inside channel, then something happens ]
+
+seems to be related to a singleshot mode -- you probably want D9 mode all
+the time?  idk, because there is also dac_uart_counter
+
+90 xx xx xx: cal_apply(ch, 0, 0, 6, 50000)
+92 xx xx xx: cal_apply(ch, 0, 0, 7, 50000)
+
+[ used as a limit in d8d9=0 mode ]
+
+
+OTHER COMMANDS KNOWN:
+c0/c1 -- output enable? channel_output_enable_inner
+  GP0.0x10000
+
+c2/c3 -- response enable?
+[internal to channel: c4 is "c2 but 0x64 instead of 0"]
+enables responses for AE/B2
+toggled internally in update_uartvals_output
+cleared after cc-c3
+set by c1
+
+c6/c7/c8/c9/ca/cb -- load mode
+c7 turns on a GPIO, c6/c8/c9/ca/cb leave it off
+  GP1.0x100000
+
+
+cc/cd/ce? -- bond mode
+[ stored in channel but never used... phew ]
+
+
+80 xx xx xx (value always channel ID * 256 + 1)
+in at least one case, an override for d8d9
+
+ba xx xx xx
+
+
+END CALIBRATION:
+c0 for all channels
+80 xx xx xx for all channels
+
+BOND MODE:
+
+c2 for both channels
+cc + bond mode for both channels
+set up vset, iset
+set up the relays (chan_set_gpio_in_bond)
+c3 for both channels
+
+
+LOAD MODE:
+
+c2
+c6 + load mode
+set GPIOs in load mode
+set up vset, iset
+c3
