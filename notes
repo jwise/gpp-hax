@@ -223,15 +223,15 @@ P0.13 AD0[7]
 P0.14
 P0.15 UART1 TXD
 P0.16 UART1 RXD
-P0.17
+P0.17 [owned by 14eba] presumably external GPIO paralleling P3.24 etc?
 P0.18 GPIO OUT CH1 LED
-P0.19
+P0.19 [owned by 14eba] presumably external GPIO paralleling P3.24 etc?
 P0.20 GPIO OUT CH4 LED
 P0.21 GPIO OUT CH2 LED
-P0.22
-P0.23
+P0.22 [owned by 14eba] presumably external GPIO paralleling P3.24 etc?
+P0.23 [owned by 14eba] presumably external GPIO paralleling P3.24 etc?
 P0.24 GPIO OUT CH3 LED
-P0.25
+P0.25 [owned by 14eba] presumably external GPIO paralleling P3.24 etc?
 P0.26 GPIO IN  btn
 P0.27
 P0.28
@@ -329,11 +329,11 @@ P3.20 GPIO OUT btn
 P3.21 GPIO OUT btn
 P3.22 GPIO IN btn
 P3.23 GPIO IN btn
-P3.24 GPIO OUT ? = 1
-P3.25 GPIO OUT ? = 1
-P3.26 GPIO OUT ? = 1
-P3.27 GPIO OUT ? = 1
-P3.28 GPIO OUT ? = 1
+P3.24 GPIO OUT ? = 1 -- gpio 0x1f maybe external trigger pull down inverted?
+P3.25 GPIO OUT ? = 1 -- gpio 0x20 maybe external trigger pull down inverted?
+P3.26 GPIO OUT ? = 1 -- gpio 0x21 maybe external trigger pull down inverted?
+P3.27 GPIO OUT ? = 1 -- gpio 0x22 maybe external trigger pull down inverted?
+P3.28 GPIO OUT ? = 1 -- gpio 0x23 maybe external trigger pull down inverted?
 P3.29 GPIO IN btn
 P3.30 GPIO IN btn
 P3.31 GPIO IN btn
@@ -470,8 +470,13 @@ D0 / D1 / D2 / D3: set channel ID
 
 D4/D5: something
 [ stored inside channel ]
+  set on boot to D4 mode
+    on entering cal in ea7c mode, it gets set to D9
 
 D9/D8: something else
+  set on init to D9 mode
+    on entering cal in ea7c mode, it gets set to D8 mode
+    also gets set in FLT SCPI command
 [ stored inside channel, then something happens ]
 
 seems to be related to a singleshot mode -- you probably want D9 mode all

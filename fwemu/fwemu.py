@@ -47,7 +47,6 @@ def reg_hle(sym, fn):
 
 def hook_code(mu, address, size, user_data):
     if address+1 in hle_syms:
-        print(f">>> HLE {symnames[address]}")
         rv = hle_syms[address+1](mu, mu.reg_read(UC_ARM_REG_R0), mu.reg_read(UC_ARM_REG_R1), mu.reg_read(UC_ARM_REG_R2), mu.reg_read(UC_ARM_REG_R3))
         mu.reg_write(UC_ARM_REG_R0, rv)
 
@@ -67,9 +66,14 @@ def hook_mem_access_unmapped(uc, access, addr, sz, val, data):
 
 def hle_nop(mu, r0, r1, r2, r3):
     return r0
+
+def hle_log(mu, r0, r1, r2, r3):
+    address = mu.reg_read(UC_ARM_REG_PC)
+    print(f">>> HLE {symnames[address]}({r0:08x}, {r1:08x}, {r2:08x}, {r3:08x}), lr = {mu.reg_read(UC_ARM_REG_LR):08x}")
+    return r0
 reg_hle('delay', hle_nop)
 reg_hle('gpio_cfg_from_table', hle_nop)
-reg_hle('gpio_set_from_table', hle_nop)
+reg_hle('gpio_set_from_table', hle_log)
 reg_hle('PINSEL_ConfigPin', hle_nop)
 reg_hle('FUN_0000b71a', hle_nop) # some kind of pinsel
 reg_hle('SystemInit', hle_nop)
@@ -100,14 +104,13 @@ def hle_ssp_setup_maybe(mu, r0, r1, r2, r3):
 reg_hle('ssp_setup_maybe', hle_ssp_setup_maybe)
 
 def hle_ssp0_txbyte(mu, r0, r1, r2, r3):
-    print(f"    SPI flash cmd {r0:02x}")
+    print(f">>> SPI flash cmd {r0:02x}")
     return 0
 reg_hle('ssp0_txbyte', hle_ssp0_txbyte)
 
 def hle_sflash_read_page(mu, adr, buf, sz, must_be_3):
     if must_be_3 != 3:
         raise RuntimeError('invalid arg3 for sflash_read_page')
-    print(f"    SPI flash read {adr:08x}")
     mu.mem_write(buf, sflash[adr:adr+sz])
     return 1
 reg_hle('sflash_read_page', hle_sflash_read_page)
@@ -118,17 +121,17 @@ reg_hle('FUN_00018f5c', hle_set_lcd_base)
 
 
 def hle_uart_config_baud_int(mu, r0, r1, r2, r3):
-    print(f"    UART{r0} = {r1} baud")
+    print(f">>> UART{r0} = {r1} baud")
     return 0
 reg_hle('uart_config_baud_int', hle_uart_config_baud_int)
 
 def hle_uart_xmit_cmd_1(mu, r0, r1, r2, r3):
-    print(f"    ch{r0} <- {r1:02x}")
+    print(f">>> ch{r0} <- {r1:02x}")
     return 0
 reg_hle('uart_xmit_cmd_1', hle_uart_xmit_cmd_1)
 
 def hle_uart_xmit_cmd_4(mu, r0, r1, r2, r3):
-    print(f"    ch{r0} <- cmd {r1:02x}, payload {r2:06x}")
+    print(f">>> ch{r0} <- cmd {r1:02x}, payload {r2:06x}")
     return 0
 reg_hle('uart_xmit_cmd_4', hle_uart_xmit_cmd_4)
 
@@ -150,6 +153,11 @@ reg_hle('GPIO_OutputValue', hle_barf)
 reg_hle('GPIO_ReadValue', hle_barf)
 reg_hle(0xb4b6, hle_barf)
 
+
+def watchpoint(uc, addr, f):
+    def hook(uc, access, addr, sz, val, data):
+        f(uc, addr, val)
+    uc.hook_add(UC_HOOK_MEM_WRITE, hook, begin = addr, end = addr)
 
 def main():
     STACK = 0x7ac0000
@@ -173,6 +181,20 @@ def main():
         mu.hook_add(UC_HOOK_CODE, hook_code, begin = hleadr - 1, end = hleadr - 1)
     
     mu.mem_map(0xFF000000, 0x10000)
+    
+    def watch_gppsta_nonpersist(mu, addr, val):
+        if val == 0:
+            return
+        print(f"WRITE TO GPPSTA_NONPERSIST {val:08x}, PC = {mu.reg_read(UC_ARM_REG_PC):08x}")
+        def watch_d4d5(mu, addr, val):
+            print(f"WRITE TO D4D5, PC = {mu.reg_read(UC_ARM_REG_PC):08x}")
+        watchpoint(mu, val + 0xA0, watch_d4d5)
+        def watch_d9d8(mu, addr, val):
+            print(f"WRITE TO D9D8, PC = {mu.reg_read(UC_ARM_REG_PC):08x}")
+        watchpoint(mu, val + 0xB4, watch_d9d8)
+    watchpoint(mu, 0x10004550, watch_gppsta_nonpersist)
+    
+    #mu.hook_add(UC_HOOK_MEM_WRITE, hook_mem_access_function, begin = 0x20000000, end = 0x21000000)
 
     mu.reg_write(UC_ARM_REG_SP, STACK + int(STACK_SZ/2))
     callfn(mu, 'unpack_bytes', 0x73018, 0x10000000, 0x4654)
