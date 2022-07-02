@@ -245,7 +245,7 @@ P1.02
 P1.03 GPIO OUT ??? 0 (can be PWM0[2] in init)
 P1.04 ENET_TX_EN
 P1.05 PWM0[3] == GPIO OUT early init 1 fan_n
-P1.06 GPIO IN  early init
+P1.06 GPIO IN  early init -- HW type MSB
 P1.07 GPIO OUT ??? 1 set as 1 in gpp_pwm_init on hwver=1
 P1.08 ENET_CRS
 P1.09 ENET_RXD0
@@ -353,15 +353,15 @@ P4.11
 P4.12
 P4.13
 P4.14
-P4.15 GPIO IN  early init
+P4.15 GPIO IN  early init -- HW_TYPE detect lsb
 P4.16 GPIO OUT ? = 0 channel_gpio_0
 P4.17 GPIO OUT ? = 0 channel_gpio_1
 P4.18 GPIO OUT ? = 0 channel_gpio_2
 P4.19 GPIO OUT ? = 0 channel_gpio_3
 P4.20 GPIO OUT ? = 0 channel_reset
 P4.21 GPIO OUT ? = 0
-P4.22 GPIO IN  early init
-P4.23 GPIO IN  early init
+P4.22 GPIO IN  early init -- GPIB detect
+P4.23 GPIO IN  early init -- ENET detect
 P4.24 EMC
 P4.25 EMC
 P4.26
