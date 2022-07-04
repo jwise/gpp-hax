@@ -73,7 +73,6 @@ def hle_log(mu, r0, r1, r2, r3):
     return r0
 reg_hle('delay', hle_nop)
 reg_hle('gpio_cfg_from_table', hle_nop)
-reg_hle('gpio_set_from_table', hle_log)
 reg_hle('PINSEL_ConfigPin', hle_nop)
 reg_hle('FUN_0000b71a', hle_nop) # some kind of pinsel
 reg_hle('SystemInit', hle_nop)
@@ -115,9 +114,10 @@ def hle_sflash_read_page(mu, adr, buf, sz, must_be_3):
     return 1
 reg_hle('sflash_read_page', hle_sflash_read_page)
 
-def hle_set_lcd_base(mu, r0, r1, r2, r3):
+def hle_ui_set_active_framebuffer(mu, r0, r1, r2, r3):
+    print(f">>> UI: window change to {r0:08x}")
     return r0
-reg_hle('FUN_00018f5c', hle_set_lcd_base)
+reg_hle('FUN_00018f5c', hle_ui_set_active_framebuffer)
 
 
 def hle_uart_config_baud_int(mu, r0, r1, r2, r3):
@@ -140,6 +140,40 @@ def hle_get_hw_type(mu, r0, r1, r2, r3):
     return 3
 reg_hle('get_hw_type', hle_get_hw_type)
 
+def hle_gpio_set_from_table(mu, r0, r1, r2, r3):
+    print(f">>> GPIO set({r0}) = {r1}, lr = {mu.reg_read(UC_ARM_REG_LR):08x}")
+    return 0
+reg_hle('gpio_set_from_table', hle_gpio_set_from_table)
+
+def incr_wait_for_voltage_counter(mu):
+    v = struct.unpack("<L", mu.mem_read(0x10004620, 4))[0]
+    mu.mem_write(0x10004620, struct.pack("<L", v+1))
+
+uart_in = [b"", b"", b"", b""]
+def uart_get_byte(mu, uart, addr):
+    incr_wait_for_voltage_counter(mu)
+    if len(uart_in[uart]) == 0:
+#        print(f">>> UART read ch{uart} EMPTY")
+        return 0
+    by = uart_in[uart][0:1]
+    print(f">>> UART read ch{uart} {by[0]:02x}")
+    uart_in[uart] = uart_in[uart][1:]
+    mu.mem_write(addr, by)
+    return 1
+
+def hle_uart1_get_byte(mu, r0, r1, r2, r3):
+    return uart_get_byte(mu, 0, r0)
+reg_hle('uart1_get_byte', hle_uart1_get_byte)
+def hle_uart2_get_byte(mu, r0, r1, r2, r3):
+    return uart_get_byte(mu, 1, r0)
+reg_hle('uart2_get_byte', hle_uart2_get_byte)
+def hle_uart3_get_byte(mu, r0, r1, r2, r3):
+    return uart_get_byte(mu, 2, r0)
+reg_hle('uart3_get_byte', hle_uart3_get_byte)
+def hle_uart4_get_byte(mu, r0, r1, r2, r3):
+    return uart_get_byte(mu, 3, r0)
+reg_hle('uart4_get_byte', hle_uart4_get_byte)
+
 
 no_barf = {
     0xa93b: True, # GPP_SW_INIT
@@ -151,6 +185,7 @@ def hle_barf(mu, r0, r1, r2, r3):
     raise RuntimeError(f'bad function call from lr {mu.reg_read(UC_ARM_REG_LR):08x}')
 reg_hle('GPIO_OutputValue', hle_barf)
 reg_hle('GPIO_ReadValue', hle_barf)
+reg_hle('timer0_wait_ticks', hle_log)
 reg_hle(0xb4b6, hle_barf)
 
 
@@ -205,6 +240,22 @@ def main():
     callfn(mu, 'GPPHard')
     callfn(mu, 'gpp_sw_init')
     
+    callfn(mu, 'chan_load_set', 0, 1)
+    callfn(mu, 'chan_load_set', 1, 1)
+    callfn(mu, 'chan_load_set', 0, 0)
+    callfn(mu, 'chan_load_set', 1, 0)
+    callfn(mu, 'chan_load_set', 0, 2)
+    callfn(mu, 'chan_load_set', 1, 2)
+    callfn(mu, 'chan_load_set', 0, 0)
+    callfn(mu, 'chan_load_set', 1, 0)
+    callfn(mu, 'chan_load_set', 0, 3)
+    callfn(mu, 'chan_load_set', 1, 3)
+    callfn(mu, 'chan_load_set', 0, 0)
+    callfn(mu, 'chan_load_set', 1, 0)
+    
+    callfn(mu, 'chan_set_bond_mode', 0, 1) # output series
+    callfn(mu, 'chan_set_bond_mode', 0, 2) # output parallel
+    callfn(mu, 'chan_set_bond_mode', 0, 0) # output normal
 
 if __name__ == "__main__":
     main()

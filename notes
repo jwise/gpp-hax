@@ -291,19 +291,19 @@ P2.15 GPIO IN knob
 P2.16 EMC
 P2.17 EMC
 P2.18 EMC
-P2.19 GPIO OUT ? = 0
+P2.19 GPIO OUT parallel enable step 1
 P2.20 EMC
-P2.21 GPIO OUT ? = 0
+P2.21 GPIO OUT parallel enable step 2
 P2.22 SSP0 SCK
 P2.23 GPIO OUT SFLASH CS_n
 P2.24 EMC
-P2.25 GPIO OUT ? = 0
+P2.25 GPIO OUT parallel enable step 3
 P2.26 SSP0 MISO
 P2.27 SSP0 MOSI
 P2.28 EMC
 P2.29 EMC
-P2.30 GPIO OUT ? = 0
-P2.31 GPIO OUT ?  =0
+P2.30 GPIO OUT channel 0 load enable 1/2
+P2.31 GPIO OUT channel 1 load enable 1/2
 
 P3.00 EMC
 P3.01 EMC
@@ -359,20 +359,20 @@ P4.17 GPIO OUT ? = 0 channel_gpio_1
 P4.18 GPIO OUT ? = 0 channel_gpio_2
 P4.19 GPIO OUT ? = 0 channel_gpio_3
 P4.20 GPIO OUT ? = 0 channel_reset
-P4.21 GPIO OUT ? = 0
+P4.21 GPIO OUT channel 1 load enable
 P4.22 GPIO IN  early init -- GPIB detect
 P4.23 GPIO IN  early init -- ENET detect
 P4.24 EMC
 P4.25 EMC
 P4.26
-P4.27 GPIO OUT ? = 0
+P4.27 GPIO OUT channel 0 load enable
 P4.28 LCD
 P4.29 LCD
 P4.30 EMC
 P4.31
 
-P5.00 GPIO OUT early init 0
-P5.01 GPIO OUT early init 0
+P5.00 GPIO OUT early init 0 series enable step 2
+P5.01 GPIO OUT early init 0 series enable step 1
 P5.02
 P5.03 UART4 RXD
 P5.04 UART4 TXD
@@ -520,17 +520,119 @@ c0 for all channels
 
 BOND MODE:
 
+c4 for both channels
 c2 for both channels
-cc + bond mode for both channels
+cc + bond mode for both channels (cd = series, ce = parallel, cc = normal)
 set up vset, iset
 set up the relays (chan_set_gpio_in_bond)
 c3 for both channels
 
+setting relays for series mode:       set(1) = 1, sleep(50), set(0) = 1
+setting relays series -> normal mode: set(1) = 0, sleep(50), set(0) = 0
+setting relays for parallel mode:     set(9) = 1, sleep(50), set(10) = 1, sleep(50), set(11) = 1
+setting relays for normal mode:       set(11) = 0, sleep(50), set(10) = 0, sleep(50), set(9) = 0
+
+GPIO0  = P5.00
+GPIO1  = P5.01
+GPIO9  = P2.19
+GPIO10 = P2.21
+GPIO11 = P2.25
 
 LOAD MODE:
 
+optionally, do the "reset dance"
+c4
+wait for zero
 c2
+sleep(0x32)
 c6 + load mode
+sleep(0x14)
 set GPIOs in load mode
+sleep(0x14)
 set up vset, iset
 c3
+
+setting ch0 to load: set(13) = 1, set(12) = 1
+setting ch1 to load: set(15) = 1, set(14) = 1
+
+setting ch0 to src : set(13) = 0, set(12) = 0
+setting ch1 to src : set(15) = 0, set(14) = 0
+
+
+gpio12 = P4.27
+gpio13 = P2.30
+gpio14 = P4.21
+gpio15 = P2.31
+
+load modes: CV = 1, CC = 2, CR = 3
+
+*** HOW DO THE CALIBRATION TABLES WORK?
+
+cal_apply_maybe 
+
+call sites:
+  cal_update_vout_mv
+  cal_update_iout
+  calculate_channel_90
+    cal_apply(ch, 0, 0, 6, 50000)
+  calculate_channel_92
+    cal_apply(ch, 0, 0, 7, 50000)
+  unknown init sequence: 10007e1c unused
+  chan_recalculate_all
+    cal_apply(ch, loadmode, bondmode, CAL_VADC, value)
+    cal_apply(ch, loadmode, bondmode, CAL_IADC, value)
+  3813c (gppseq)
+    cal_apply(p1, p2 (non-2) (load mode?), 0, CAL_VOUT, value)
+  38188 (gppseq)
+    cal_apply(p1, p2 (non-1) (load mode?), 0, CAL_IOUT, value)
+  chan_update_b0_ac_for_load
+    maybe only called in load mode?  depending on channel_thing_that_controls_ac:
+      b0 = cal_apply(ch, 2, 0, CAL_IOUT, value)
+      ac = cal_apply(ch, 1, 0, CAL_VOUT, value)
+  channel_write_iset_100ua
+    b0 = cal_apply(ch, load_mode, bond_mode, CAL_IOUT, value)
+  channel_write_vset_mv
+    ac = cal_apply(ch, load_mode, bond_mode, CAL_VOUT, value)
+
+TABLES ARE:
+  vout, vadc, iout, iadc, [?], [?], 90, 92
+TABLE INDEX PTRS:
+  load mode == 0:
+    bond = 0: 4434c: 00 01 02 03 08 0A 0C 0D
+    bond = 1: 44354: 00 01 02 03 08 0A 0C 0D (SERIES)
+    bond = 2: 4435c: 00 01 04 05 09 0A 0C 0D (PARALLEL)
+  load mode nonzero:
+    bond = *: 44364: 06 07 02 03 08 0B 0C 0D
+
+look this up as tables[ch][idx*2] for index, idx*2+1 for datum
+
+table index lengths:
+
+  00: 0x43
+  01: 0x43
+  02: 0x21
+  03: 0x21
+  04: 0x21
+  05: 0x21
+  06: 0x22
+  07: 0x22
+  08: 0x21
+  09: 0x21
+  0A: 0x22
+  0B: 0x22
+  0C: 0x43
+  0D: 0x21
+
+table lengths:
+
+
+*** HOW DOES OVP/OCP WORK?
+
+lol idk, the SCPI functions for that are crazy
+
+*** TEMPERATURE?
+
+*** WHO CAUSES THE RELAYS TO CLICK FOR CHANNEL VOLTAGE CHANGES?
+
+ch1 / ch2 clicks at 7.7Vout, 15.1Vout, 23.5Vout
+ch3 / ch4 do not click
