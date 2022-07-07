@@ -24,6 +24,7 @@
 70x000: 0x80-byte blocks of data (gppsta_persist? aa55a55a)
 
 714000: 0x3700 from 0x1000466c (channel calibration buffer? aa55ff5a)
+        4x 0xdc0 sized blocks
 
 7ff000: hwver (0 or 1)
 

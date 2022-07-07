@@ -608,20 +608,20 @@ look this up as tables[ch][idx*2] for index, idx*2+1 for datum
 
 table index lengths:
 
-  00: 0x43
-  01: 0x43
-  02: 0x21
-  03: 0x21
-  04: 0x21
-  05: 0x21
-  06: 0x22
-  07: 0x22
-  08: 0x21
-  09: 0x21
-  0A: 0x22
-  0B: 0x22
-  0C: 0x43
-  0D: 0x21
+  00: 0x43 (v mv -> vdac, src)
+  01: 0x43 (vadc -> v mv, src)
+  02: 0x21 (i ma -> idac, non-parallel)
+  03: 0x21 (iadc -> i ma, non-parallel)
+  04: 0x21 (i ma -> idac, parallel)
+  05: 0x21 (iadc -> i ma, parallel)
+  06: 0x22 (v mv -> vdac, load)
+  07: 0x22 (vadc -> v mv, load)
+  08: 0x21 (?tab 4      , non-parallel)
+  09: 0x21 (?tab 4      , parallel)
+  0A: 0x22 (?tab 5      , src)
+  0B: 0x22 (?tab 5      , load)
+  0C: 0x43 (0x90)
+  0D: 0x21 (0x92)
 
 table lengths:
 
