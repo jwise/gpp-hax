@@ -14,28 +14,6 @@ RET_ADDR = 0xFF00FF00
 
 hle_syms = {}
 
-def callfn(mu, sym, *args):
-    mu.reg_write(UC_ARM_REG_LR, RET_ADDR)
-    # assume SP is already set appropriately
-    if len(args) > 0:
-        mu.reg_write(UC_ARM_REG_R0, args[0])
-    if len(args) > 1:
-        mu.reg_write(UC_ARM_REG_R1, args[1])
-    if len(args) > 2:
-        mu.reg_write(UC_ARM_REG_R2, args[2])
-    if len(args) > 3:
-        mu.reg_write(UC_ARM_REG_R3, args[3])
-    if len(args) > 4:
-        raise ValueError("too many args in call")
-    print(f">>> call {sym}{args}")
-    if type(sym) == str:
-        addr = syms[sym]['addr'] + 1
-    else:
-        addr = sym
-    mu.emu_start(addr, RET_ADDR)
-    r0 = mu.reg_read(UC_ARM_REG_R0)
-    print(f"    -> {r0:x}")
-    return 0
 
 def reg_hle(sym, fn):
     if type(sym) == str:
@@ -149,6 +127,10 @@ def incr_wait_for_voltage_counter(mu):
     v = struct.unpack("<L", mu.mem_read(0x10004620, 4))[0]
     mu.mem_write(0x10004620, struct.pack("<L", v+1))
 
+def incr_recalculate_timer(mu):
+    v = struct.unpack("<L", mu.mem_read(0x10004614, 4))[0]
+    mu.mem_write(0x10004614, struct.pack("<L", v+1))
+
 uart_in = [b"", b"", b"", b""]
 def uart_get_byte(mu, uart, addr):
     incr_wait_for_voltage_counter(mu)
@@ -174,6 +156,10 @@ def hle_uart4_get_byte(mu, r0, r1, r2, r3):
     return uart_get_byte(mu, 3, r0)
 reg_hle('uart4_get_byte', hle_uart4_get_byte)
 
+# ... later
+def hle_adc_ch_is_done(mu, r0, r1, r2, r3):
+    return 0
+reg_hle('adc_ch_is_done', hle_adc_ch_is_done)
 
 no_barf = {
     0xa93b: True, # GPP_SW_INIT
@@ -193,6 +179,34 @@ def watchpoint(uc, addr, f):
     def hook(uc, access, addr, sz, val, data):
         f(uc, addr, val)
     uc.hook_add(UC_HOOK_MEM_WRITE, hook, begin = addr, end = addr)
+
+def callfn(mu, sym, *args):
+    mu.reg_write(UC_ARM_REG_LR, RET_ADDR)
+    # assume SP is already set appropriately
+    if len(args) > 0:
+        mu.reg_write(UC_ARM_REG_R0, args[0])
+    if len(args) > 1:
+        mu.reg_write(UC_ARM_REG_R1, args[1])
+    if len(args) > 2:
+        mu.reg_write(UC_ARM_REG_R2, args[2])
+    if len(args) > 3:
+        mu.reg_write(UC_ARM_REG_R3, args[3])
+    if len(args) > 4:
+        raise ValueError("too many args in call")
+    print(f">>> call {sym}{args}")
+    if type(sym) == str:
+        addr = syms[sym]['addr'] + 1
+    else:
+        addr = sym
+    mu.emu_start(addr, RET_ADDR)
+    r0 = mu.reg_read(UC_ARM_REG_R0)
+    print(f"    -> {r0:x}")
+    return 0
+
+def mainloop_once(mu):
+    print(">>> main loop iter")
+    mu.emu_start(0xad42+1, 0xadfc)
+    print("    -> done")
 
 def main():
     STACK = 0x7ac0000
@@ -227,6 +241,12 @@ def main():
         def watch_d9d8(mu, addr, val):
             print(f"WRITE TO D9D8, PC = {mu.reg_read(UC_ARM_REG_PC):08x}")
         watchpoint(mu, val + 0xB4, watch_d9d8)
+        def watch_vadc(mu, addr, val):
+            print(f"WRITE TO vadc0: {val}")
+        watchpoint(mu, val + 0xe4, watch_vadc)
+        def watch_vout_mv(mu, addr, val):
+            print(f"WRITE TO vout_mv: {val}")
+        watchpoint(mu, val + 0x0, watch_vout_mv)
     watchpoint(mu, 0x10004550, watch_gppsta_nonpersist)
     
     #mu.hook_add(UC_HOOK_MEM_WRITE, hook_mem_access_function, begin = 0x20000000, end = 0x21000000)
@@ -256,6 +276,30 @@ def main():
     callfn(mu, 'chan_set_bond_mode', 0, 1) # output series
     callfn(mu, 'chan_set_bond_mode', 0, 2) # output parallel
     callfn(mu, 'chan_set_bond_mode', 0, 0) # output normal
+    
+    callfn(mu, 'reset_timers_and_other_things')
+    mainloop_once(mu)
+    callfn(mu, 'channel_output_enable_outer_2', 0, 1)
+    callfn(mu, 'channel_write_vset_mv', 0, 20000)
+    callfn(mu, 'channel_write_iset_100ua', 0, 1000)
+    uart_in[0] += b"\xE3"
+    def cmd_4byte(ch, cmd, data):
+        d = [cmd | (data >> 21), (data >> 14) & 0x7F, (data >> 7) & 0x7F, data & 0x7F]
+        # uart_in[ch] += bytes(d)
+        callfn(mu, 'uart_rx_multibyte_status', ch, d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3]) 
+    cmd_4byte(0, 0xAE, 0x30000)
+    incr_recalculate_timer(mu)
+    mainloop_once(mu)
+    incr_recalculate_timer(mu)
+    mainloop_once(mu)
+    incr_recalculate_timer(mu)
+    mainloop_once(mu)
+    incr_recalculate_timer(mu)
+    mainloop_once(mu)
+    incr_recalculate_timer(mu)
+    mainloop_once(mu)
+    incr_recalculate_timer(mu)
+    mainloop_once(mu)
 
 if __name__ == "__main__":
     main()

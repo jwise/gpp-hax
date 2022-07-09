@@ -473,6 +473,8 @@ D4/D5: something
   set on boot to D4 mode
     on entering cal in ea7c mode, it gets set to D9
 
+d5 is "enable ACKs" (send an 0xFF for every packet received successfully)
+
 D9/D8: something else
   set on init to D9 mode
     on entering cal in ea7c mode, it gets set to D8 mode
@@ -512,6 +514,7 @@ cc/cd/ce? -- bond mode
 in at least one case, an override for d8d9
 
 ba xx xx xx
+
 
 
 END CALIBRATION:
@@ -636,3 +639,13 @@ lol idk, the SCPI functions for that are crazy
 
 ch1 / ch2 clicks at 7.7Vout, 15.1Vout, 23.5Vout
 ch3 / ch4 do not click
+
+it does not appear to be in the ADUC firmware?
+it does not appear to be in the LPC firmware triggered by the main loop?
+
+wtf?
+
+there are some GPIOs that I do not understand around
+set_gpio_around_vout_mv...
+
+*** WHAT DO THE TWO ADCS DO (check_adc_6_or_7)?
